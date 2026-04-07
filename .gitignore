@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+
+# Virtual environments
+venv/
+.venv/
+
+# AI backends — cloned separately, never committed
+animate/backends/
+
+# Model weights — downloaded on first run, tens of GB
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.gguf
+
+# Media binaries — downloaded separately
+convert/bin/
+
+# Working directories
+input/
+output/
+animate/output/
+.tmp/
+
+# IDE
+.vscode/
+.idea/
