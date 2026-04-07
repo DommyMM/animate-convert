@@ -52,25 +52,19 @@ python orchestrate.py \
   --skip-postprocess
 ```
 
-## Output Format Guide
+## Output Formats
 
 | Goal | Format | Flag |
 |---|---|---|
-| Desktop wallpaper (best) | MP4 H.265 | `--format mp4` |
+| Desktop wallpaper | MP4 H.265 | `--format mp4` |
 | Discord avatar (≤10MB) | GIF | `--format gif --resolution 720p` |
 | Web sharing | WebP animated | `--format webp` |
 | Archive | APNG | `--format apng` |
 
-For 4K wallpapers always use MP4 — GIF at 4K is 80-350MB and capped at 256 colors. Wallpaper Engine and Lively both accept MP4 directly.
+For 4K always use MP4 — GIF at 4K is 80-350MB and capped at 256 colors. Wallpaper Engine and Lively both accept MP4 directly.
 
-## Setup
+## Docs
 
-- [animate/README.md](animate/README.md) — AI animation backends
-- [convert/README.md](convert/README.md) — Media processing tools
+- [animate/README.md](animate/README.md) — AI animation backends (FramePack, Wan 2.2, LivePortrait)
+- [convert/README.md](convert/README.md) — Media processing (FFmpeg, Real-ESRGAN, gifski)
 - [PLAN.md](PLAN.md) — Full architecture and implementation order
-
-## Git
-
-Models and weights are never committed. FramePack auto-downloads ~30GB on first run.
-ComfyUI stores its weights in its own `models/` directory outside this repo.
-All `venv/` and `backends/` directories are gitignored.

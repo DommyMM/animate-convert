@@ -4,9 +4,10 @@ __pycache__/
 *.pyo
 .env
 
-# Virtual environments
+# Virtual environments (uv manages these)
 venv/
 .venv/
+
 
 # AI backends — cloned separately, never committed
 animate/backends/
