@@ -41,8 +41,8 @@ Target output resolution: 4K (3840×2160). Lower is acceptable. Wallpaper Engine
 - `ffmpeg` / `ffprobe` — already installed system-wide
 - `magick` (ImageMagick) — already installed system-wide
 - `realesrgan-ncnn-vulkan.exe` — in `convert/bin/`, models in `convert/bin/models/`
-- `gifski.exe` — installed to `C:\Program Files\gifski\gifski.exe`
-- `gifsicle.exe` — **not yet installed** (needs `choco install gifsicle` from admin terminal)
+- `gifski.exe` — CLI installed via cargo to `C:\Users\domin\.cargo\bin\gifski.exe` (v1.34.0). The winget gifski is a GUI app — ignore it.
+- `gifsicle.exe` — installed via choco to `C:\ProgramData\chocolatey\lib\gifsicle\tools\gifsicle.exe`
 
 **Python deps:** typer, fastapi, uvicorn, rich, pytest (dev)
 
@@ -90,10 +90,10 @@ Stdlib only. Calls `animate/run_<backend>.py` then `convert/` CLI via subprocess
 - [x] `convert/` uv project initialized (pyproject.toml, .venv)
 - [x] `animate/` uv project initialized
 - [x] Real-ESRGAN ncnn-vulkan extracted to `convert/bin/` with all models
-- [x] gifski installed (`C:\Program Files\gifski\gifski.exe`)
+- [x] gifski CLI installed via cargo (`C:\Users\domin\.cargo\bin\gifski.exe` v1.34.0)
+- [x] gifsicle installed via choco (v1.95)
 - [x] ffmpeg installed system-wide
 - [x] ImageMagick installed system-wide
-- [ ] gifsicle — needs `choco install gifsicle` from admin terminal
 - [ ] `convert/` core modules not yet written
 - [ ] `animate/` backends not yet cloned/set up
 

@@ -1,7 +1,7 @@
 [project]
 name = "convert"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local media processing: upscale, GIF, MP4, loop"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.135.3",
@@ -10,7 +10,18 @@ dependencies = [
     "uvicorn>=0.44.0",
 ]
 
+[project.scripts]
+convert = "convert.main:app"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["convert*"]

@@ -19,8 +19,8 @@ Receives raw MP4 (from `animate/` or any source) and produces final output: upsc
 | `ffmpeg` / `ffprobe` | system PATH | installed |
 | `magick` (ImageMagick) | system PATH | installed |
 | `realesrgan-ncnn-vulkan.exe` | `bin/` | installed + models |
-| `gifski.exe` | `C:\Program Files\gifski\` | installed |
-| `gifsicle.exe` | system PATH | **MISSING** — `choco install gifsicle` (admin) |
+| `gifski.exe` | `C:\Users\domin\.cargo\bin\` (cargo CLI, v1.34.0) | installed |
+| `gifsicle.exe` | system PATH (choco, v1.95) | installed |
 
 `config.py` resolves binaries by checking `bin/` first, then PATH. Set `GIFSKI_PATH` override if needed.
 
