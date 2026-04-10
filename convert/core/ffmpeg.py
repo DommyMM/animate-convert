@@ -113,16 +113,56 @@ def video_to_mp4(
 
 
 def pad_crop_to(input: Path, output: Path, width: int, height: int) -> Path:
-    """Scale + pad/crop frames directory or single video to exact target resolution."""
+    """Scale + pad video to exact target resolution (letterbox with black bars)."""
     output.parent.mkdir(parents=True, exist_ok=True)
-    # Scale to fit within target, then pad to exact size with black bars
     vf = (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black"
     )
-    cmd = [FFMPEG, "-y", "-i", str(input), "-vf", vf, "-c:v", "copy", str(output)]
-    # copy won't work after vf — re-encode with nvenc
     cmd = [FFMPEG, "-y", "-i", str(input), "-vf", vf] + NVENC_H265_ARGS + [str(output)]
+    _run(cmd)
+    return output
+
+
+def trim(input: Path, output: Path, start: float | None = None, end: float | None = None, duration: float | None = None) -> Path:
+    """Trim a video. Specify start/end in seconds, or start+duration."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [FFMPEG, "-y"]
+    if start is not None:
+        cmd += ["-ss", str(start)]
+    cmd += ["-i", str(input)]
+    if end is not None:
+        cmd += ["-to", str(end - (start or 0))]
+    elif duration is not None:
+        cmd += ["-t", str(duration)]
+    cmd += ["-c", "copy", str(output)]
+    _run(cmd)
+    return output
+
+
+def resize(input: Path, output: Path, width: int, height: int = -2) -> Path:
+    """Resize video. height=-2 preserves aspect ratio."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [FFMPEG, "-y", "-i", str(input), "-vf", f"scale={width}:{height}"]
+    cmd += NVENC_H265_ARGS + [str(output)]
+    _run(cmd)
+    return output
+
+
+def change_speed(input: Path, output: Path, factor: float) -> Path:
+    """Change video speed. factor=2.0 → 2x faster, 0.5 → half speed."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [FFMPEG, "-y", "-i", str(input), "-vf", f"setpts={1/factor}*PTS"]
+    cmd += NVENC_H265_ARGS + [str(output)]
+    _run(cmd)
+    return output
+
+
+def reverse(input: Path, output: Path) -> Path:
+    """Reverse a video."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [FFMPEG, "-y", "-i", str(input), "-vf", "reverse"]
+    cmd += NVENC_H265_ARGS + [str(output)]
     _run(cmd)
     return output
 

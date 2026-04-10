@@ -2,8 +2,8 @@
 convert — local media processing CLI
 
 Usage:
-    uv run python -m convert <command> [options]
-    uv run python -m convert --help
+    uv run convert <command> [options]
+    uv run convert --help
 """
 import shutil
 from pathlib import Path
@@ -15,8 +15,15 @@ from rich.table import Table
 
 from convert import config
 
-app = typer.Typer(help="Local media processing: upscale, convert, optimize, loop.")
+app = typer.Typer(help="Local media processing: convert, upscale, optimize, loop.")
 console = Console()
+
+
+def _size_str(path: Path) -> str:
+    size = path.stat().st_size
+    if size > 1_048_576:
+        return f"{size / 1_048_576:.1f} MB"
+    return f"{size // 1024} KB"
 
 
 # ---------------------------------------------------------------------------
@@ -56,76 +63,143 @@ def check():
 
 
 # ---------------------------------------------------------------------------
-# upscale
+# info
 # ---------------------------------------------------------------------------
 
 @app.command()
-def upscale(
-    input:  Annotated[Path, typer.Argument(help="Input image or video")],
-    output: Annotated[Path, typer.Argument(help="Output path")],
-    scale:  Annotated[int,  typer.Option(help="Scale factor (2 or 4)")] = 4,
-    model:  Annotated[str,  typer.Option(help="Real-ESRGAN model name")] = config.DEFAULT_REALESRGAN_MODEL,
-):
-    """Upscale an image or video via Real-ESRGAN (Vulkan)."""
-    from convert.upscale.realesrgan import upscale_image
-    if input.suffix.lower() in {".mp4", ".mkv", ".webm", ".avi", ".mov", ".gif"}:
-        from convert.core.pipeline import upscale_then_mp4
-        console.print(f"Upscaling video [cyan]{input}[/cyan] → [cyan]{output}[/cyan] ({scale}x, {model})")
-        upscale_then_mp4(input, output, scale=scale, model=model)
-    else:
-        console.print(f"Upscaling image [cyan]{input}[/cyan] → [cyan]{output}[/cyan] ({scale}x, {model})")
-        upscale_image(input, output, scale=scale, model=model)
-    console.print(f"[green]Done:[/green] {output}")
+def info(input: Annotated[Path, typer.Argument(help="Video or GIF to inspect")]):
+    """Print video metadata (fps, resolution, duration, frame count)."""
+    from convert.core.ffmpeg import get_video_info
+    data = get_video_info(input)
+    table = Table(title=str(input))
+    table.add_column("Property", style="cyan")
+    table.add_column("Value")
+    for k, v in data.items():
+        table.add_row(k, str(round(v, 3) if isinstance(v, float) else v))
+    console.print(table)
 
 
 # ---------------------------------------------------------------------------
-# convert (generic)
+# convert (generic — format from output extension)
 # ---------------------------------------------------------------------------
 
 @app.command(name="convert")
 def convert_cmd(
-    input:   Annotated[Path, typer.Argument(help="Input video or GIF")],
-    output:  Annotated[Path, typer.Argument(help="Output path (extension determines format)")],
-    fps:     Annotated[float | None, typer.Option(help="Output fps")] = None,
-    width:   Annotated[int | None,   typer.Option(help="Output width (height auto)")] = None,
+    input:    Annotated[Path, typer.Argument(help="Input file")],
+    output:   Annotated[Path, typer.Argument(help="Output path (extension determines format)")],
+    fps:      Annotated[float | None, typer.Option(help="Output fps")] = None,
+    width:    Annotated[int | None,   typer.Option(help="Resize width (height auto)")] = None,
+    quality:  Annotated[int, typer.Option(help="Quality for WebP (0-100)")] = 80,
+    colors:   Annotated[int, typer.Option(help="GIF palette size")] = config.DEFAULT_GIF_COLORS,
+    lossy:    Annotated[int | None, typer.Option(help="GIF lossy level (40-100)")] = None,
 ):
-    """Convert video ↔ GIF ↔ MP4. Format inferred from output extension."""
-    from convert.converters.to_gif import video_to_gif
-    from convert.converters.to_mp4 import video_to_mp4
-
+    """Convert between formats. Output format inferred from extension."""
     ext = output.suffix.lower()
+    console.print(f"Converting [cyan]{input}[/cyan] → [cyan]{output}[/cyan]")
+
     if ext == ".gif":
-        console.print(f"Converting [cyan]{input}[/cyan] → GIF")
-        video_to_gif(input, output, fps=fps or config.DEFAULT_FPS, width=width)
-    elif ext in {".mp4", ".mkv"}:
-        console.print(f"Converting [cyan]{input}[/cyan] → MP4")
+        from convert.converters.to_gif import video_to_gif
+        video_to_gif(input, output, fps=fps or config.DEFAULT_FPS, width=width, colors=colors, lossy=lossy)
+    elif ext in {".mp4", ".mkv", ".mov"}:
+        from convert.converters.to_mp4 import video_to_mp4
         video_to_mp4(input, output, fps=fps, width=width)
+    elif ext == ".webp":
+        from convert.converters.to_webp import video_to_webp
+        video_to_webp(input, output, fps=fps, width=width, quality=quality)
+    elif ext in {".apng", ".png"}:
+        if ext == ".png" and input.suffix.lower() in {".mp4", ".mkv", ".webm", ".avi", ".mov", ".gif", ".webp"}:
+            from convert.converters.to_apng import video_to_apng
+            video_to_apng(input, output, fps=fps, width=width)
+        else:
+            # Static image conversion via ffmpeg
+            from convert.core.ffmpeg import _run
+            cmd = [str(config.FFMPEG), "-y", "-i", str(input)]
+            if width:
+                cmd += ["-vf", f"scale={width}:-2"]
+            cmd += [str(output)]
+            _run(cmd)
     else:
-        console.print(f"[red]Unknown output format:[/red] {ext}")
-        raise typer.Exit(1)
-    console.print(f"[green]Done:[/green] {output}")
+        # Fallback: let ffmpeg figure it out
+        from convert.core.ffmpeg import _run
+        cmd = [str(config.FFMPEG), "-y", "-i", str(input)]
+        if fps:
+            cmd += ["-r", str(fps)]
+        if width:
+            cmd += ["-vf", f"scale={width}:-2"]
+        cmd += [str(output)]
+        _run(cmd)
+
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
 
 
 # ---------------------------------------------------------------------------
-# upscale-gif
+# trim
 # ---------------------------------------------------------------------------
 
-@app.command(name="upscale-gif")
-def upscale_gif(
-    input:   Annotated[Path, typer.Argument(help="Input video or GIF")],
-    output:  Annotated[Path, typer.Argument(help="Output .gif path")],
-    scale:   Annotated[int,  typer.Option()] = 2,
-    fps:     Annotated[float, typer.Option()] = config.DEFAULT_FPS,
-    width:   Annotated[int | None, typer.Option()] = None,
-    colors:  Annotated[int, typer.Option()] = config.DEFAULT_GIF_COLORS,
-    lossy:   Annotated[int | None, typer.Option(help="gifsicle lossy level (40-100)")] = None,
-    model:   Annotated[str, typer.Option()] = config.DEFAULT_REALESRGAN_MODEL,
+@app.command()
+def trim(
+    input:    Annotated[Path, typer.Argument(help="Input video")],
+    output:   Annotated[Path, typer.Argument(help="Output video")],
+    start:    Annotated[float | None, typer.Option(help="Start time in seconds")] = None,
+    end:      Annotated[float | None, typer.Option(help="End time in seconds")] = None,
+    duration: Annotated[float | None, typer.Option(help="Duration in seconds (alternative to --end)")] = None,
 ):
-    """Upscale frames then encode as GIF (gifski + gifsicle)."""
-    from convert.core.pipeline import upscale_then_gif
-    console.print(f"Upscale→GIF [cyan]{input}[/cyan] → [cyan]{output}[/cyan] ({scale}x, {fps}fps)")
-    upscale_then_gif(input, output, scale=scale, fps=fps, width=width, colors=colors, lossy=lossy, model=model)
-    console.print(f"[green]Done:[/green] {output}  ({output.stat().st_size // 1024} KB)")
+    """Trim a video to a time range."""
+    from convert.core.ffmpeg import trim as _trim
+    console.print(f"Trimming [cyan]{input}[/cyan] (start={start}, end={end}, duration={duration})")
+    _trim(input, output, start=start, end=end, duration=duration)
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
+
+
+# ---------------------------------------------------------------------------
+# resize
+# ---------------------------------------------------------------------------
+
+@app.command(name="resize")
+def resize_cmd(
+    input:  Annotated[Path, typer.Argument(help="Input video")],
+    output: Annotated[Path, typer.Argument(help="Output video")],
+    width:  Annotated[int, typer.Argument(help="Target width (height auto)")],
+    height: Annotated[int, typer.Option(help="Target height (-2 = auto)")] = -2,
+):
+    """Resize a video."""
+    from convert.core.ffmpeg import resize as _resize
+    console.print(f"Resizing [cyan]{input}[/cyan] → {width}×{height}")
+    _resize(input, output, width=width, height=height)
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
+
+
+# ---------------------------------------------------------------------------
+# speed
+# ---------------------------------------------------------------------------
+
+@app.command()
+def speed(
+    input:  Annotated[Path, typer.Argument(help="Input video")],
+    output: Annotated[Path, typer.Argument(help="Output video")],
+    factor: Annotated[float, typer.Argument(help="Speed factor (2.0 = 2x faster, 0.5 = half speed)")],
+):
+    """Change video playback speed."""
+    from convert.core.ffmpeg import change_speed
+    console.print(f"Speed [cyan]{input}[/cyan] × {factor}")
+    change_speed(input, output, factor=factor)
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
+
+
+# ---------------------------------------------------------------------------
+# reverse
+# ---------------------------------------------------------------------------
+
+@app.command(name="reverse")
+def reverse_cmd(
+    input:  Annotated[Path, typer.Argument(help="Input video")],
+    output: Annotated[Path, typer.Argument(help="Output video")],
+):
+    """Reverse a video."""
+    from convert.core.ffmpeg import reverse as _reverse
+    console.print(f"Reversing [cyan]{input}[/cyan]")
+    _reverse(input, output)
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
 
 
 # ---------------------------------------------------------------------------
@@ -150,9 +224,10 @@ def optimize(
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr)
-    before = input.stat().st_size // 1024
-    after = output.stat().st_size // 1024
-    console.print(f"[green]Done:[/green] {before} KB → {after} KB ({100 - after * 100 // before}% smaller)")
+    before = input.stat().st_size
+    after = output.stat().st_size
+    pct = 100 - after * 100 // before if before else 0
+    console.print(f"[green]Done:[/green] {_size_str(input)} → {_size_str(output)} ({pct}% smaller)")
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +245,51 @@ def loop_cmd(
     console.print(f"Looping [cyan]{input}[/cyan] ({crossfade_frames} crossfade frames)")
     make_seamless_loop(input, output, crossfade_frames=crossfade_frames)
     console.print(f"[green]Done:[/green] {output}")
+
+
+# ---------------------------------------------------------------------------
+# upscale
+# ---------------------------------------------------------------------------
+
+@app.command()
+def upscale(
+    input:  Annotated[Path, typer.Argument(help="Input image or video")],
+    output: Annotated[Path, typer.Argument(help="Output path")],
+    scale:  Annotated[int,  typer.Option(help="Scale factor (2 or 4)")] = 4,
+    model:  Annotated[str,  typer.Option(help="Real-ESRGAN model name")] = config.DEFAULT_REALESRGAN_MODEL,
+):
+    """Upscale an image or video via Real-ESRGAN (Vulkan)."""
+    from convert.upscale.realesrgan import upscale_image
+    if input.suffix.lower() in {".mp4", ".mkv", ".webm", ".avi", ".mov", ".gif"}:
+        from convert.core.pipeline import upscale_then_mp4
+        console.print(f"Upscaling video [cyan]{input}[/cyan] ({scale}x, {model})")
+        upscale_then_mp4(input, output, scale=scale, model=model)
+    else:
+        console.print(f"Upscaling image [cyan]{input}[/cyan] ({scale}x, {model})")
+        upscale_image(input, output, scale=scale, model=model)
+    console.print(f"[green]Done:[/green] {output}")
+
+
+# ---------------------------------------------------------------------------
+# upscale-gif
+# ---------------------------------------------------------------------------
+
+@app.command(name="upscale-gif")
+def upscale_gif(
+    input:   Annotated[Path, typer.Argument(help="Input video or GIF")],
+    output:  Annotated[Path, typer.Argument(help="Output .gif path")],
+    scale:   Annotated[int,  typer.Option()] = 2,
+    fps:     Annotated[float, typer.Option()] = config.DEFAULT_FPS,
+    width:   Annotated[int | None, typer.Option()] = None,
+    colors:  Annotated[int, typer.Option()] = config.DEFAULT_GIF_COLORS,
+    lossy:   Annotated[int | None, typer.Option(help="gifsicle lossy level (40-100)")] = None,
+    model:   Annotated[str, typer.Option()] = config.DEFAULT_REALESRGAN_MODEL,
+):
+    """Upscale frames then encode as GIF (gifski + gifsicle)."""
+    from convert.core.pipeline import upscale_then_gif
+    console.print(f"Upscale→GIF [cyan]{input}[/cyan] ({scale}x, {fps}fps)")
+    upscale_then_gif(input, output, scale=scale, fps=fps, width=width, colors=colors, lossy=lossy, model=model)
+    console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
 
 
 # ---------------------------------------------------------------------------
@@ -205,20 +325,3 @@ def pipeline_wallpaper(
         loop=loop, crossfade_frames=crossfade_frames, model=model,
     )
     console.print(f"[green]Done:[/green] {output}")
-
-
-# ---------------------------------------------------------------------------
-# info
-# ---------------------------------------------------------------------------
-
-@app.command()
-def info(input: Annotated[Path, typer.Argument(help="Video or GIF to inspect")]):
-    """Print video metadata (fps, resolution, duration, frame count)."""
-    from convert.core.ffmpeg import get_video_info
-    data = get_video_info(input)
-    table = Table(title=str(input))
-    table.add_column("Property", style="cyan")
-    table.add_column("Value")
-    for k, v in data.items():
-        table.add_row(k, str(round(v, 3) if isinstance(v, float) else v))
-    console.print(table)
