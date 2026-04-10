@@ -94,7 +94,12 @@ Stdlib only. Calls `animate/run_<backend>.py` then `convert/` CLI via subprocess
 - [x] gifsicle installed via choco (v1.95)
 - [x] ffmpeg installed system-wide
 - [x] ImageMagick installed system-wide
-- [ ] `convert/` core modules not yet written
+- [x] waifu2x ncnn-vulkan extracted to `convert/bin/waifu2x/` with cunet/anime/photo models
+- [x] `convert/` core modules implemented and tested:
+  - config.py, core/ffmpeg.py, upscale/realesrgan.py, upscale/waifu2x.py
+  - converters/to_gif.py, to_mp4.py, to_webp.py, to_apng.py
+  - core/pipeline.py, tools/loop.py
+  - main.py CLI: check, info, convert, trim, resize, speed, reverse, optimize, loop, upscale, upscale-gif, pipeline wallpaper
 - [ ] `animate/` backends not yet cloned/set up
 
 ## What NOT to do
