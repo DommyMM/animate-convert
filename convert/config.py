@@ -33,8 +33,9 @@ GIFSKI    = _find("gifski")
 GIFSICLE  = _find("gifsicle")
 REALESRGAN = _find("realesrgan-ncnn-vulkan")
 
-# waifu2x — optional, user has it locally
-WAIFU2X: Path | None = _find("waifu2x-ncnn-vulkan", required=False)
+# waifu2x — in bin/waifu2x/ subdirectory
+_waifu2x_candidate = BIN / "waifu2x" / "waifu2x-ncnn-vulkan.exe"
+WAIFU2X: Path | None = _waifu2x_candidate if _waifu2x_candidate.exists() else _find("waifu2x-ncnn-vulkan", required=False)
 
 # Real-ESRGAN models directory (next to the exe in bin/)
 REALESRGAN_MODELS = REALESRGAN.parent / "models" if REALESRGAN else None

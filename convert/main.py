@@ -254,18 +254,34 @@ def loop_cmd(
 def upscale(
     input:  Annotated[Path, typer.Argument(help="Input image or video")],
     output: Annotated[Path, typer.Argument(help="Output path")],
-    scale:  Annotated[int,  typer.Option(help="Scale factor (2 or 4)")] = 4,
-    model:  Annotated[str,  typer.Option(help="Real-ESRGAN model name")] = config.DEFAULT_REALESRGAN_MODEL,
+    scale:  Annotated[int,  typer.Option(help="Scale factor (2 or 4)")] = 2,
+    engine: Annotated[str,  typer.Option(help="Upscaler: realesrgan or waifu2x")] = "realesrgan",
+    model:  Annotated[str | None,  typer.Option(help="Model name (engine-specific)")] = None,
+    noise:  Annotated[int,  typer.Option(help="waifu2x denoise level (-1 to 3)")] = -1,
 ):
-    """Upscale an image or video via Real-ESRGAN (Vulkan)."""
-    from convert.upscale.realesrgan import upscale_image
-    if input.suffix.lower() in {".mp4", ".mkv", ".webm", ".avi", ".mov", ".gif"}:
-        from convert.core.pipeline import upscale_then_mp4
-        console.print(f"Upscaling video [cyan]{input}[/cyan] ({scale}x, {model})")
-        upscale_then_mp4(input, output, scale=scale, model=model)
+    """Upscale an image or video via Real-ESRGAN or waifu2x (Vulkan)."""
+    is_video = input.suffix.lower() in {".mp4", ".mkv", ".webm", ".avi", ".mov", ".gif"}
+
+    if engine == "waifu2x":
+        from convert.upscale.waifu2x import upscale_image as w2x_image
+        actual_model = model or "models-cunet"
+        if is_video:
+            from convert.core.pipeline import upscale_then_mp4_waifu2x
+            console.print(f"Upscaling video [cyan]{input}[/cyan] ({scale}x, waifu2x {actual_model}, noise={noise})")
+            upscale_then_mp4_waifu2x(input, output, scale=scale, noise=noise, model=actual_model)
+        else:
+            console.print(f"Upscaling image [cyan]{input}[/cyan] ({scale}x, waifu2x {actual_model}, noise={noise})")
+            w2x_image(input, output, scale=scale, noise=noise, model=actual_model)
     else:
-        console.print(f"Upscaling image [cyan]{input}[/cyan] ({scale}x, {model})")
-        upscale_image(input, output, scale=scale, model=model)
+        actual_model = model or config.DEFAULT_REALESRGAN_MODEL
+        if is_video:
+            from convert.core.pipeline import upscale_then_mp4
+            console.print(f"Upscaling video [cyan]{input}[/cyan] ({scale}x, realesrgan {actual_model})")
+            upscale_then_mp4(input, output, scale=scale, model=actual_model)
+        else:
+            from convert.upscale.realesrgan import upscale_image
+            console.print(f"Upscaling image [cyan]{input}[/cyan] ({scale}x, realesrgan {actual_model})")
+            upscale_image(input, output, scale=scale, model=actual_model)
     console.print(f"[green]Done:[/green] {output}")
 
 

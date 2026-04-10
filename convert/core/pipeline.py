@@ -83,6 +83,35 @@ def upscale_then_mp4(
         raise
 
 
+def upscale_then_mp4_waifu2x(
+    input: Path,
+    output: Path,
+    scale: int = 2,
+    fps: float | None = None,
+    noise: int = -1,
+    model: str = "models-cunet",
+    nvenc: bool = True,
+) -> Path:
+    """MP4 → extract frames → waifu2x upscale → NVENC H.265 → output MP4."""
+    from convert.upscale.waifu2x import upscale_frames as w2x_upscale
+    tmp = _tmpdir()
+    try:
+        info = get_video_info(input)
+        out_fps = fps or info["fps"]
+        raw_frames = tmp / "raw"
+        up_frames = tmp / "upscaled"
+
+        extract_frames(input, raw_frames, fps=fps)
+        w2x_upscale(raw_frames, up_frames, scale=scale, noise=noise, model=model)
+
+        result = frames_to_mp4(up_frames, output, fps=out_fps, nvenc=nvenc)
+        shutil.rmtree(tmp)
+        return result
+    except Exception:
+        print(f"[pipeline] temp files preserved at {tmp}")
+        raise
+
+
 def animate_to_4k_wallpaper(
     input: Path,
     output: Path,
