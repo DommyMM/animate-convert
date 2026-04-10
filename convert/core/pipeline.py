@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from convert.config import (
-    TEMP_DIR, DEFAULT_FPS, DEFAULT_GIF_COLORS,
+    TEMP_DIR, DEFAULT_FPS,
     DEFAULT_REALESRGAN_MODEL, DEFAULT_CROSSFADE_FRAMES,
 )
 from convert.core.ffmpeg import extract_frames, frames_to_video, get_video_info, pad_crop_to
@@ -30,7 +30,7 @@ def upscale_then_gif(
     scale: int = 2,
     fps: float = DEFAULT_FPS,
     width: int | None = None,
-    colors: int = DEFAULT_GIF_COLORS,
+    quality: int = 90,
     lossy: int | None = None,
     model: str = DEFAULT_REALESRGAN_MODEL,
 ) -> Path:
@@ -46,7 +46,7 @@ def upscale_then_gif(
         result = frames_to_gif(
             sorted(up_frames.glob("*.png")),
             output,
-            fps=fps, width=width, colors=colors, lossy=lossy,
+            fps=fps, width=width, quality=quality, lossy=lossy,
         )
         shutil.rmtree(tmp)
         return result
@@ -94,7 +94,7 @@ def animate_to_4k_wallpaper(
     fps: float | None = None,
     loop: bool = True,
     crossfade_frames: int = DEFAULT_CROSSFADE_FRAMES,
-    gif_colors: int = DEFAULT_GIF_COLORS,
+    gif_quality: int = 90,
     gif_lossy: int | None = None,
 ) -> Path:
     """
@@ -149,7 +149,7 @@ def animate_to_4k_wallpaper(
                 sorted(gif_frames.glob("*.png")),
                 output,
                 fps=min(out_fps, DEFAULT_FPS),
-                colors=gif_colors,
+                quality=gif_quality,
                 lossy=gif_lossy,
             )
         else:

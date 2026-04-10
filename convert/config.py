@@ -41,7 +41,6 @@ REALESRGAN_MODELS = REALESRGAN.parent / "models" if REALESRGAN else None
 
 # Defaults
 DEFAULT_FPS             = 15
-DEFAULT_GIF_COLORS      = 256
 DEFAULT_REALESRGAN_MODEL = "realesr-animevideov3"
 DEFAULT_CROSSFADE_FRAMES = 15
 

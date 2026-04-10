@@ -89,9 +89,8 @@ def convert_cmd(
     output:   Annotated[Path, typer.Argument(help="Output path (extension determines format)")],
     fps:      Annotated[float | None, typer.Option(help="Output fps")] = None,
     width:    Annotated[int | None,   typer.Option(help="Resize width (height auto)")] = None,
-    quality:  Annotated[int, typer.Option(help="Quality for WebP (0-100)")] = 80,
-    colors:   Annotated[int, typer.Option(help="GIF palette size")] = config.DEFAULT_GIF_COLORS,
-    lossy:    Annotated[int | None, typer.Option(help="GIF lossy level (40-100)")] = None,
+    quality:  Annotated[int, typer.Option(help="Quality 1-100 (GIF gifski quality, WebP quality)")] = 90,
+    lossy:    Annotated[int | None, typer.Option(help="GIF gifsicle lossy level (40-100)")] = None,
 ):
     """Convert between formats. Output format inferred from extension."""
     ext = output.suffix.lower()
@@ -99,7 +98,7 @@ def convert_cmd(
 
     if ext == ".gif":
         from convert.converters.to_gif import video_to_gif
-        video_to_gif(input, output, fps=fps or config.DEFAULT_FPS, width=width, colors=colors, lossy=lossy)
+        video_to_gif(input, output, fps=fps or config.DEFAULT_FPS, width=width, quality=quality, lossy=lossy)
     elif ext in {".mp4", ".mkv", ".mov"}:
         from convert.converters.to_mp4 import video_to_mp4
         video_to_mp4(input, output, fps=fps, width=width)
@@ -212,7 +211,7 @@ def optimize(
     output:  Annotated[Path, typer.Argument(help="Output .gif")],
     level:   Annotated[int, typer.Option(help="gifsicle -O level (1-3)")] = 3,
     lossy:   Annotated[int | None, typer.Option(help="gifsicle lossy level (40-100)")] = None,
-    colors:  Annotated[int, typer.Option()] = config.DEFAULT_GIF_COLORS,
+    colors:  Annotated[int, typer.Option(help="gifsicle palette size")] = 256,
 ):
     """Optimize a GIF with gifsicle."""
     import subprocess
@@ -281,14 +280,14 @@ def upscale_gif(
     scale:   Annotated[int,  typer.Option()] = 2,
     fps:     Annotated[float, typer.Option()] = config.DEFAULT_FPS,
     width:   Annotated[int | None, typer.Option()] = None,
-    colors:  Annotated[int, typer.Option()] = config.DEFAULT_GIF_COLORS,
+    quality: Annotated[int, typer.Option(help="gifski quality 1-100")] = 90,
     lossy:   Annotated[int | None, typer.Option(help="gifsicle lossy level (40-100)")] = None,
     model:   Annotated[str, typer.Option()] = config.DEFAULT_REALESRGAN_MODEL,
 ):
     """Upscale frames then encode as GIF (gifski + gifsicle)."""
     from convert.core.pipeline import upscale_then_gif
     console.print(f"Upscale→GIF [cyan]{input}[/cyan] ({scale}x, {fps}fps)")
-    upscale_then_gif(input, output, scale=scale, fps=fps, width=width, colors=colors, lossy=lossy, model=model)
+    upscale_then_gif(input, output, scale=scale, fps=fps, width=width, quality=quality, lossy=lossy, model=model)
     console.print(f"[green]Done:[/green] {output}  ({_size_str(output)})")
 
 
